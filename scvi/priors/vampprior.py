@@ -12,7 +12,6 @@ class VampPrior(BasePrior):
     def __init__(self, n_latent: int, n_input: int, encoder: Encoder,
                  n_components: int = 200):
         super(VampPrior, self).__init__()
-
         self.n_input = n_input
         self.n_latent = n_latent
 
@@ -44,3 +43,7 @@ class VampPrior(BasePrior):
     
     def description(self):
         return "Vamp Prior with pseudo inputs: " + str(self.pseudo_inputs) + " and mixing parameter : " + str(self.w)
+
+    def get_pseudo_inputs(self):
+        psi = self.pseudo_transfromer(self.pseudo_inputs)
+        return psi, self.encoder(psi)

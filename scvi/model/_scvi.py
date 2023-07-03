@@ -107,12 +107,11 @@ class SCVI(
         dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
         gene_likelihood: Literal["zinb", "nb", "poisson"] = "zinb",
         latent_distribution: Literal["normal", "ln"] = "normal",
-        prior_distribution: Literal["normal", "vamp"] = "normal",
+        prior_distribution: Literal["sdnormal", "normal", "mixofgaus","vamp"] = "sdnormal",
         prior_kwargs: Optional[dict] = None,
         **model_kwargs,
     ):
         super().__init__(adata)
-        print("New version.")
         n_cats_per_cov = (
             self.adata_manager.get_state_registry(
                 REGISTRY_KEYS.CAT_COVS_KEY
