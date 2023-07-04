@@ -19,6 +19,7 @@ from scvi.nn import DecoderSCVI, Encoder, LinearDecoderSCVI, one_hot
 from scvi.priors.gaussianprior import GaussianPrior
 from scvi.priors.mixofgausprior import MixOfGausPrior
 from scvi.priors.vampprior import VampPrior
+from scvi.priors.sdnormal import StandartNormalPrior
 
 torch.backends.cudnn.benchmark = True
 
@@ -31,6 +32,10 @@ def kl_normal_normal(p, q):
     return kl(np,nq)
 
 @register_kl(Normal, GaussianPrior)
+def kl_normal_normal(p, q):
+    nq = Normal(q.mean,q.logvar)
+    return kl(p,nq)
+@register_kl(Normal, StandartNormalPrior)
 def kl_normal_normal(p, q):
     nq = Normal(q.mean,q.logvar)
     return kl(p,nq)
@@ -241,7 +246,7 @@ class VAE(BaseMinifiedModeModuleClass):
         self.prior_distribution = prior_distribution
         prior_kwargs = {} if prior_kwargs is None else prior_kwargs
         if prior_distribution == "sdnormal":
-            self.prior = Normal(torch.zeros(n_latent),torch.ones(n_latent))
+            self.prior = StandartNormalPrior(n_latent=n_latent)
         elif prior_distribution == "normal":
             self.prior = GaussianPrior(n_latent=n_latent, **prior_kwargs)
         elif prior_distribution == "mixofgaus":
