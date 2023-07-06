@@ -10,12 +10,12 @@ class MixOfGausPrior(BasePrior):
         super(MixOfGausPrior, self).__init__()
         self.k = k
         self.w = torch.nn.Parameter(torch.zeros(k,))
-        self.mean = torch.nn.Parameter(torch.zeros((k,n_latent)))
-        self.logvar = torch.nn.Parameter(torch.ones((k,n_latent)))
+        self.mean = torch.nn.Parameter(torch.randn((k,n_latent)))
+        self.logvar = torch.nn.Parameter(torch.randn((k,n_latent)))
 
     @property
     def distribution(self):
-        comp = Normal(self.mean,self.logvar)
+        comp = Normal(self.mean,torch.exp(self.logvar))
         comp = dist.Independent(comp,1)
         mix = dist.Categorical(F.softmax(self.w, dim=0))
         return dist.MixtureSameFamily(mix, comp)
