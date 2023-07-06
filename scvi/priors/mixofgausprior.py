@@ -9,7 +9,7 @@ class MixOfGausPrior(BasePrior):
     def __init__(self, n_latent: int, k : int = 100):
         super(MixOfGausPrior, self).__init__()
         self.k = k
-        self.w = torch.nn.Parameter(torch.zeros(k,))
+        self.w = torch.nn.Parameter(torch.zeros(k))
         self.mean = torch.nn.Parameter(torch.zeros((k,n_latent)))
         self.logvar = torch.nn.Parameter(torch.ones((k,n_latent)))
 
@@ -27,4 +27,4 @@ class MixOfGausPrior(BasePrior):
         return self.distribution.log_prob(z)
     
     def description(self):
-        return "Mixture of Gaussians with k: " +str(self.k)+ "Prior with means: " + str(self.mean) + " and log variance: " + str(self.logvar)
+        return "Mixture of Gaussians with w: " +str(self.w)+ "Prior with means: " + str(self.mean) + " and log variance: " + str(self.logvar)
