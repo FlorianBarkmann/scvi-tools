@@ -20,6 +20,7 @@ from scvi.priors.gaussianprior import GaussianPrior
 from scvi.priors.mixofgausprior import MixOfGausPrior
 from scvi.priors.vampprior import VampPrior
 from scvi.priors.sdnormal import StandartNormalPrior
+from scvi.priors.normalflowprior import NormalFlow
 
 torch.backends.cudnn.benchmark = True
 
@@ -253,6 +254,8 @@ class VAE(BaseMinifiedModeModuleClass):
             self.prior = MixOfGausPrior(n_latent=n_latent, **prior_kwargs)
         elif prior_distribution == "vamp":
             self.prior = VampPrior(n_latent=n_latent, n_input=n_input, encoder=self.z_encoder, **prior_kwargs)
+        elif prior_distribution == "normalflow":
+            self.prior = NormalFlow(n_latent=n_latent, **prior_kwargs)
         else:
             raise NotImplementedError(f"{prior_distribution=} is not implemented.")
 
