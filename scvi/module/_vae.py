@@ -132,7 +132,7 @@ class VAE(BaseMinifiedModeModuleClass):
         log_variational: bool = True,
         gene_likelihood: Tunable[Literal["zinb", "nb", "poisson"]] = "zinb",
         latent_distribution: Tunable[Literal["normal", "ln"]] = "normal",
-        prior_distribution: Literal["sdnormal", "normal", "mixofgaus", "vamp"] = "sdnormal",
+        prior_distribution: Tunable[Literal["sdnormal", "normal", "mixofgaus", "vamp","normalflow"]] = "sdnormal",
         prior_kwargs: Optional[dict] = None,
         encode_covariates: Tunable[bool] = False,
         deeply_inject_covariates: Tunable[bool] = True,

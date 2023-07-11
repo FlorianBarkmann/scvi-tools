@@ -147,7 +147,7 @@ class TrainingPlan(TunableMixin, pl.LightningModule):
         weight_decay: Tunable[float] = 1e-6,
         eps: Tunable[float] = 0.01,
         n_steps_kl_warmup: Tunable[int] = None,
-        n_epochs_kl_warmup: Tunable[int] = 400,
+        n_epochs_kl_warmup: Tunable[int] = 100,
         reduce_lr_on_plateau: Tunable[bool] = False,
         lr_factor: Tunable[float] = 0.6,
         lr_patience: Tunable[int] = 30,

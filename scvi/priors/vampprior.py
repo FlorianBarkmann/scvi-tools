@@ -3,14 +3,13 @@ import torch.distributions as dist
 import torch.nn.functional as F
 from torch import nn
 from torch.distributions import Normal
-
 from scvi.nn import Encoder
 from scvi.priors.base_prior import BasePrior
-
+from scvi.autotune._types import Tunable
 
 class VampPrior(BasePrior):
     def __init__(self, n_latent: int, n_input: int, encoder: Encoder,
-                 n_components: int = 200, n_hidden: int = 256):
+                 n_components: Tunable[int] = 200, n_hidden: Tunable[int] = 256):
         super(VampPrior, self).__init__()
         self.n_input = n_input
         self.n_latent = n_latent

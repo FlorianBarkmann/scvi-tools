@@ -3,12 +3,11 @@ from torch.distributions import Normal
 import torch.distributions as dist
 from scvi.priors.base_prior import BasePrior
 import normflows as nf
+from scvi.autotune._types import Tunable
 
 class NormalFlow(BasePrior):
-    def __init__(self, n_latent: int, num_layers: int = 32):
+    def __init__(self, n_latent: int, num_layers: Tunable[int] = 32):
         super(NormalFlow, self).__init__()
-        self.mean = torch.nn.Parameter(torch.zeros((n_latent,)))
-        self.logvar = torch.nn.Parameter(torch.ones((n_latent,)))
         self.base = nf.distributions.base.DiagGaussian(n_latent)
         self.flows = []
         for i in range(num_layers):
