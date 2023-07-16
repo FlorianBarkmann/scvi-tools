@@ -6,14 +6,15 @@ import normflows as nf
 from scvi.autotune._types import Tunable
 
 class NormalFlow(BasePrior):
-    def __init__(self, n_latent: int, num_layers: Tunable[int] = 32):
+    def __init__(self, n_latent: int, num_layers: Tunable[int] = 32, flow = None):
         super(NormalFlow, self).__init__()
         self.base = nf.distributions.base.DiagGaussian(n_latent)
         self.flows = []
-        for i in range(num_layers):
+        if flow is None:
             param_map = nf.nets.MLP([int(n_latent/2),64,64,n_latent], init_zeros=True)
-            self.flows.append(nf.flows.AffineCouplingBlock(param_map))
-            self.flows.append(nf.flows.Permute(n_latent,mode='swap'))
+            self.flow = [nf.flows.AffineCouplingBlock(param_map),nf.flows.Permute(n_latent,mode='swap')]
+        for i in range(num_layers):
+            self.flows.extend(flow)   
         self.dist = nf.NormalizingFlow(self.base,self.flows)
 
     @property
