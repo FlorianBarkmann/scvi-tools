@@ -12,7 +12,8 @@ class NormalFlow(BasePrior):
         self.flows = []
         if flow is None:
             param_map = nf.nets.MLP([int(n_latent/2),64,64,n_latent], init_zeros=True)
-            self.flow = [nf.flows.AffineCouplingBlock(param_map),nf.flows.Permute(n_latent,mode='swap')]
+            flow = [nf.flows.AffineCouplingBlock(param_map),nf.flows.Permute(n_latent,mode='swap')]
+
         for i in range(num_layers):
             self.flows.extend(flow)   
         self.dist = nf.NormalizingFlow(self.base,self.flows)
