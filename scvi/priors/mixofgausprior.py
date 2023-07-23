@@ -15,7 +15,7 @@ class MixOfGausPrior(BasePrior):
         self.logvar = torch.nn.Parameter(torch.randn((k,n_latent)))
     @property
     def distribution(self):
-        comp = Normal(self.mean,torch.exp(self.logvar))
+        comp = Normal(self.mean,torch.exp(0.5 * self.logvar))
         comp = dist.Independent(comp,1)
         mix = dist.Categorical(F.softmax(self.w, dim=0))
         return dist.MixtureSameFamily(mix, comp)
