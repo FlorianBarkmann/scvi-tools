@@ -16,7 +16,6 @@ from scvi.data._constants import ADATA_MINIFY_TYPE
 from scvi.distributions import NegativeBinomial, Poisson, ZeroInflatedNegativeBinomial
 from scvi.module.base import BaseMinifiedModeModuleClass, LossOutput, auto_move_data
 from scvi.nn import DecoderSCVI, Encoder, LinearDecoderSCVI, one_hot
-from scvi.priors.gaussianprior import GaussianPrior
 from scvi.priors.mixofgausprior import MixOfGausPrior
 from scvi.priors.vampprior import VampPrior
 from scvi.priors.sdnormal import StandartNormalPrior
@@ -26,16 +25,6 @@ torch.backends.cudnn.benchmark = True
 
 logger = logging.getLogger(__name__)
 
-@register_kl(GaussianPrior, GaussianPrior)
-def kl_normal_normal(p, q):
-    np = Normal(p.mean,p.log_var)
-    nq = Normal(q.mean,q.log_var)
-    return kl(np,nq)
-
-@register_kl(Normal, GaussianPrior)
-def kl_normal_normal(p, q):
-    nq = Normal(q.mean,q.logvar)
-    return kl(p,nq)
 @register_kl(Normal, StandartNormalPrior)
 def kl_normal_normal(p, q):
     nq = Normal(q.mean,q.logvar)
@@ -248,8 +237,6 @@ class VAE(BaseMinifiedModeModuleClass):
         prior_kwargs = {} if prior_kwargs is None else prior_kwargs
         if prior_distribution == "sdnormal":
             self.prior = StandartNormalPrior(n_latent=n_latent)
-        elif prior_distribution == "normal":
-            self.prior = GaussianPrior(n_latent=n_latent, **prior_kwargs)
         elif prior_distribution == "mixofgaus":
             self.prior = MixOfGausPrior(n_latent=n_latent, **prior_kwargs)
         elif prior_distribution == "vamp":

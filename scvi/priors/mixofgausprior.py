@@ -7,7 +7,7 @@ from scvi.autotune._types import Tunable
 
 
 class MixOfGausPrior(BasePrior):
-    def __init__(self, n_latent: int, k : Tunable[int] = 100):
+    def __init__(self, n_latent: int, k : Tunable[int] = 50):
         super(MixOfGausPrior, self).__init__()
         self.k = k
         self.w = torch.nn.Parameter(torch.zeros(k,))

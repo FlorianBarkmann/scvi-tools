@@ -6,7 +6,7 @@ import normflows as nf
 from scvi.autotune._types import Tunable
 
 class NormalFlow(BasePrior):
-    def __init__(self, n_latent: int, num_layers: Tunable[int] = 32, flow = None):
+    def __init__(self, n_latent: int, num_layers: Tunable[int] = 8, flow = None):
         super(NormalFlow, self).__init__()
         self.base = nf.distributions.base.DiagGaussian(n_latent)
         self.flows = []
