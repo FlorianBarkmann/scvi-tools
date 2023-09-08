@@ -1,7 +1,8 @@
 import logging
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import torch
 from anndata import AnnData
 
 from scvi import REGISTRY_KEYS
@@ -24,7 +25,6 @@ from scvi.model.base import UnsupervisedTrainingMixin
 from scvi.model.utils import get_minified_adata_scrna
 from scvi.module import CanSigVAE
 from scvi.utils import setup_anndata_dsp
-
 from .base import ArchesMixin, BaseMinifiedModeModelClass, RNASeqMixin, VAEMixin
 
 _SCVI_LATENT_QZM = "_scvi_latent_qzm"
@@ -102,13 +102,18 @@ class CanSig(
         adata: AnnData,
         n_hidden: int = 128,
         n_latent: int = 10,
+        n_cnv_latent: int = 10,
         n_layers: int = 1,
         dropout_rate: float = 0.1,
         dispersion: Literal["gene", "gene-batch", "gene-label", "gene-cell"] = "gene",
         gene_likelihood: Literal["zinb", "nb", "poisson"] = "zinb",
         latent_distribution: Literal["normal", "ln"] = "normal",
-        prior_distribution: Literal["sdnormal", "normal", "mixofgaus","vamp"] = "sdnormal",
+        prior_distribution: Literal[
+            "sdnormal", "normal", "mixofgaus", "vamp"] = "sdnormal",
         prior_kwargs: Optional[dict] = None,
+        n_cnv_layers: int = 1,
+        n_cnv_hidden: int = 128,
+        n_cnv_dropout_rate: float = 0.1,
         **model_kwargs,
     ):
         super().__init__(adata)
@@ -134,6 +139,10 @@ class CanSig(
             n_input=self.summary_stats.n_vars,
             n_batch=n_batch,
             n_cnv=n_cnv,
+            n_cnv_latent=n_cnv_latent,
+            n_cnv_layers=n_cnv_layers,
+            n_cnv_hidden=n_cnv_hidden,
+            n_cnv_dropoutrate=n_cnv_dropoutrate,
             n_labels=self.summary_stats.n_labels,
             n_continuous_cov=self.summary_stats.get("n_extra_continuous_covs", 0),
             n_cats_per_cov=n_cats_per_cov,
@@ -300,3 +309,55 @@ class CanSig(
             minified_adata, minified_data_type
         )
         self.module.minified_data_type = minified_data_type
+
+    @torch.inference_mode()
+    def get_cnv_latent_representation(
+        self,
+        adata: Optional[AnnData] = None,
+        indices: Optional[Sequence[int]] = None,
+        batch_size: Optional[int] = None,
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Return the latent representation for each subclone.
+
+        This is typically denoted as :math:`z_n`.
+
+        Parameters
+        ----------
+        adata
+            AnnData object with equivalent structure to initial AnnData. If `None`, defaults to the
+            AnnData object used to initialize the model.
+        indices
+            Indices of cells in adata to use. If `None`, all cells are used.
+        give_mean
+            Give mean of distribution or sample from it.
+        mc_samples
+            For distributions with no closed-form mean (e.g., `logistic normal`), how many Monte Carlo
+            samples to take for computing mean.
+        batch_size
+            Minibatch size for data loading into model. Defaults to `scvi.settings.batch_size`.
+        return_dist
+            Return (mean, variance) of distributions instead of just the mean.
+            If `True`, ignores `give_mean` and `mc_samples`. In the case of the latter,
+            `mc_samples` is used to compute the mean of a transformed distribution.
+            If `return_dist` is true the untransformed mean and variance are returned.
+
+        Returns
+        -------
+        Low-dimensional representation for each cell or a tuple containing its mean and variance.
+        """
+        self._check_if_trained(warn=False)
+
+        adata = self._validate_anndata(adata)
+        scdl = self._make_data_loader(
+            adata=adata, indices=indices, batch_size=batch_size
+        )
+        latent = []
+        for tensors in scdl:
+            inference_inputs = self.module._get_inference_input(tensors)
+            outputs = self.module.inference(**inference_inputs)
+
+            latent_cnv = outputs["latent_cnv"]
+
+            latent += [latent_cnv.cpu()]
+
+        return torch.cat(latent).numpy()

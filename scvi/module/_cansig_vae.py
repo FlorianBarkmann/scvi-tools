@@ -23,12 +23,28 @@ from scvi.priors.vampprior import VampPrior
 
 torch.backends.cudnn.benchmark = True
 import torch.nn as nn
+
 logger = logging.getLogger(__name__)
+
 
 @register_kl(Normal, StandartNormalPrior)
 def kl_normal_normal(p, q):
-    nq = Normal(q.mean,q.logvar)
-    return kl(p,nq)
+    nq = Normal(q.mean, q.logvar)
+    return kl(p, nq)
+
+
+def cnv_encoder_factory(n_cnv: int, n_cnv_latent: int, cnv_n_layers: int = 1,
+                        cnv_n_hidden: int = 128,
+                        cnv_dropout_rate: float = 0.1):
+    if cnv_n_layers == 0:
+        return nn.Linear(n_cnv, n_cnv_latent)
+    return (
+        torch.nn.Sequential(
+            *[FCLayers(n_cnv, cnv_n_hidden, n_layers=cnv_n_layers, n_hidden=cnv_n_hidden,
+                       inject_covariates=False, dropout_rate=cnv_dropout_rate),
+              nn.Linear(128, n_cnv_latent)])
+    )
+
 
 class CanSigVAE(BaseMinifiedModeModuleClass):
     """Variational auto-encoder model.
@@ -108,7 +124,10 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
         self,
         n_input: int,
         n_cnv: int,
-        n_cnv_latent: int = 10,
+        n_cnv_latent: int,
+        n_cnv_layers: int = 1,
+        n_cnv_hidden: int = 128,
+        n_cnv_dropout_rate: float = 0.1,
         n_batch: int = 0,
         n_labels: int = 0,
         n_hidden: Tunable[int] = 128,
@@ -123,8 +142,10 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
         log_variational: bool = True,
         gene_likelihood: Tunable[Literal["zinb", "nb", "poisson"]] = "zinb",
         latent_distribution: Tunable[Literal["normal", "ln"]] = "normal",
-        prior_distribution: Tunable[Literal["sdnormal", "normal", "mixofgaus", "vamp","normalflow"]] = "sdnormal",
+        prior_distribution: Tunable[Literal[
+            "sdnormal", "normal", "mixofgaus", "vamp", "normalflow"]] = "sdnormal",
         prior_kwargs: Optional[dict] = None,
+        cnv_encoder_kwargs: Optional[dict] = None,
         encode_covariates: Tunable[bool] = False,
         deeply_inject_covariates: Tunable[bool] = True,
         use_batch_norm: Tunable[Literal["encoder", "decoder", "none", "both"]] = "both",
@@ -189,10 +210,10 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
         n_input_encoder = n_input + n_continuous_cov * encode_covariates
         cat_list = [n_batch] + list([] if n_cats_per_cov is None else n_cats_per_cov)
         encoder_cat_list = cat_list if encode_covariates else None
-        _extra_encoder_kwargs = extra_encoder_kwargs or {}
 
-        self.cnv_encoder = torch.nn.Sequential(*[FCLayers(n_cnv, 128, n_layers=1),
-                                                 nn.Linear(128, n_cnv_latent)])
+        self.cnv_encoder = cnv_encoder_factory(n_cnv, n_cnv_latent, n_cnv_layers,
+                                               n_cnv_hidden,
+                                               n_cnv_dropout_rate)
 
         self.z_encoder = Encoder(
             n_input_encoder,
@@ -246,7 +267,8 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
         elif prior_distribution == "mixofgaus":
             self.prior = MixOfGausPrior(n_latent=n_latent, **prior_kwargs)
         elif prior_distribution == "vamp":
-            self.prior = VampPrior(n_latent=n_latent, n_input=n_input, encoder=self.z_encoder, **prior_kwargs)
+            self.prior = VampPrior(n_latent=n_latent, n_input=n_input,
+                                   encoder=self.z_encoder, **prior_kwargs)
         elif prior_distribution == "normalflow":
             self.prior = NormalFlow(n_latent=n_latent, **prior_kwargs)
         else:
@@ -384,7 +406,8 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
             else:
                 library = ql.sample((n_samples,))
         latent_cnv = self.cnv_encoder(cnvs)
-        outputs = {"z": z, "qz": qz, "ql": ql, "library": library, "latent_cnv": latent_cnv}
+        outputs = {"z": z, "qz": qz, "ql": ql, "library": library,
+                   "latent_cnv": latent_cnv}
         return outputs
 
     @auto_move_data
@@ -482,7 +505,7 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
                 local_library_log_vars,
             ) = self._compute_local_library_params(batch_index)
             pl = Normal(local_library_log_means, local_library_log_vars.sqrt())
-        #pz = Normal(torch.zeros_like(z), torch.ones_like(z))
+        # pz = Normal(torch.zeros_like(z), torch.ones_like(z))
         pz = self.prior
         return {
             "px": px,
@@ -503,8 +526,9 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
             dim=-1
         )"""
         # qz: variational posterior, pz: prior
-        if self.prior_distribution in ["sdnormal","normal"]:
-            kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(dim=-1)
+        if self.prior_distribution in ["sdnormal", "normal"]:
+            kl_divergence_z = kl(inference_outputs["qz"], generative_outputs["pz"]).sum(
+                dim=-1)
         else:
             log_q_zx = inference_outputs["qz"].log_prob(inference_outputs["z"])
             log_p_z = generative_outputs["pz"].log_prob(inference_outputs["z"])

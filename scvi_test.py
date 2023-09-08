@@ -1,99 +1,117 @@
-import scanpy as sc
+import pathlib
+from dataclasses import dataclass
+from typing import Optional
+
+import hydra.utils
 import pandas as pd
-import infercnvpy as cnv
-from sklearn.metrics import silhouette_score
+import scanpy as sc
+from hydra.core.config_store import ConfigStore
+from hydra_plugins.hydra_submitit_launcher.config import SlurmQueueConf
+from omegaconf import OmegaConf
 
-# %%
-
-adata = sc.read("neftel_ss_cnv.h5ad")
-adata = adata[adata.obs["cell_type"].notna()].copy()
-
-# %%
-highly_expressed_genes = adata.X.mean(0) > 0.1
-bdata = adata[:, highly_expressed_genes].copy()
-gene_order = pd.read_csv("../../annotations/gene_order.csv", index_col=0)
-bdata.var = bdata.var.merge(gene_order, how="left", left_index=True, right_index=True)
-
-cnv.tl.infercnv(bdata, reference_key="cell_type",
-                reference_cat=['Macrophage', 'Oligodendrocyte', 'T_cell'],
-                window_size=250)
-
-# %%
-adata.obsm["X_cnv"] = bdata.obsm["X_cnv"]
-adata.uns["cnv"] = bdata.uns["cnv"]
+import scvi.model
 
 
-# %%
+@dataclass
+class Slurm(SlurmQueueConf):
+    mem_gb: int = 16
+    timeout_min: int = 720
+    partition: str = "gpu"
+    gres: Optional[str] = "gpu:1"
 
 
-adata = adata[adata.obs["cell_type"] == "Malignant"].copy()
-adata.obs["subclones"] = None
+@dataclass
+class ModelConfig:
+    _target_: str
 
 
-for sample in adata.obs["sample"].unique():
-    idx = adata.obs["sample"]==sample
-    bdata = adata[idx].copy()
-    cnv.tl.pca(bdata)
-    cnv.pp.neighbors(bdata)
-    best_score = -1.
-    for res in [0.1 * i for i in range(1, 10)]:
-        cnv.tl.leiden(bdata, resolution=res)
-        if bdata.obs['cnv_leiden'].nunique() == 1:
-            continue
-
-        score = silhouette_score(bdata.obsm["X_cnv"], bdata.obs["cnv_leiden"])
-        if score > best_score:
-            print(f"new best socre {score} with {bdata.obs['cnv_leiden'].nunique()} clusters.")
-            best_score = score
-            adata.obs.loc[idx, "subclones"] = bdata.obs["sample"].astype(str) + bdata.obs["cnv_leiden"].astype(str)
-
-# %%
-
-cnvs = pd.DataFrame(adata.obsm["X_cnv"].todense(), index=adata.obs["subclones"])
-cnvs = cnvs.groupby(level=0).mean()
-adata.obsm["X_cnv"] = cnvs.loc[adata.obs["subclones"]].values
-
-# %%
-
-sc.pp.highly_variable_genes(adata, n_top_genes=4000, subset=True)
-
-# %%
+@dataclass
+class TrainingConfig:
+    max_epochs: int = 400
 
 
-from scvi.model import CanSig
+@dataclass
+class ScVIConfig(ModelConfig):
+    _target_: str = "scvi.model.SCVI"
+    n_latent: int = 10
+    n_layers: int = 1
+    n_hidden: int = 128
+    dropout_rate: float = 0.1
+    prior_distribution: str = "sdnormal"
 
 
-CanSig.setup_anndata(adata, cnv_key="X_cnv", layer="counts")
-model = CanSig(adata)
-model.train()
+@dataclass
+class CanSigConfig(ScVIConfig):
+    _target_: str = "scvi.model.CanSig"
+    n_cnv_latent: int = 10
+    n_cnv_layers: int = 1
+    n_cnv_hidden: int = 128
+    n_cnv_dropout_rate: float = 0.1
 
 
-# %%
-
-adata.obsm["latent"] = model.get_latent_representation()
-
-sc.pp.neighbors(adata, use_rep="latent")
-sc.tl.umap(adata)
-
-# %%
-
-adata.obs["MESlike"] = adata.obs[["MESlike1", "MESlike2"]].max(1)
-
-adata.obs["NPClike"] = adata.obs[["NPClike1", "NPClike2"]].max(1)
-
-adata.obs["Cycling"] = adata.obs[["G1S", "G2M"]].max(1)
-
-adata.obs["celltype_score"] = adata.obs[["MESlike", "NPClike", "OPClike", "AClike", "Cycling"]].idxmax(1)
-
-# %%
-
-sc.pl.umap(adata,
-           color=["MESlike", "NPClike",  "AClike", "OPClike",
-                  'sample', 'celltype_score', "G1S", "G2M"],
-           ncols=2)
-
-# %%
+@dataclass
+class Config:
+    data_path: str
+    model: ModelConfig
+    trainer: TrainingConfig = TrainingConfig()
 
 
-opc = pd.read_csv("../../annotations/glioblastoma/opc.csv", index_col=0)
-npc1 = pd.read_csv("../../annotations/glioblastoma/npc1.csv", index_col=0)
+cs = ConfigStore.instance()
+cs.store(name="config", node=Config)
+cs.store(group="hydra/launcher", name="slurm", node=Slurm, provider="submitit_launcher")
+cs.store(group="model", name="cansig", node=CanSigConfig())
+cs.store(group="model", name="scvi", node=ScVIConfig())
+
+
+def read_data(data_path: str):
+    return sc.read(data_path)
+
+
+def get_latent(model, trainer_config: TrainingConfig):
+    model.train(max_epochs=trainer_config.max_epochs)
+    return model.get_latent_representation()
+
+
+def save_latent(latent, index, path):
+    latent = pd.DataFrame(latent, index)
+    latent.to_csv(path)
+
+
+def setup_adata(adata, config):
+    if config._target_ == "scvi.model.Cansig":
+        scvi.model.CanSig.setup_anndata(adata, cnv_key="X_cnv", layer="counts")
+    elif config._target_ == "scvi.model.SCVI":
+        scvi.model.SCVI.setup_anndata(adata, batch_key="sample", layer="counts")
+    else:
+        raise ValueError(f"Unknown model config {config._target_}.")
+
+
+def save_history(model):
+    try:
+        cwd = pathlib.Path.cwd()
+        loss_dir = cwd.joinpath("losses")
+        loss_dir.mkdir()
+        for k, df in model.history.items():
+            df.to_csv(loss_dir.joinpath(f"{k}.csv"))
+    except Exception as e:
+        print(e)
+
+
+def dump_config(config: Config):
+    with open("config.yaml", "w") as f:
+        OmegaConf.save(config, f)
+
+
+@hydra.main(config_name="config", config_path=None, version_base="1.1")
+def main(config: Config):
+    dump_config(config)
+    adata = read_data(config.data_path)
+    setup_adata(adata, config.model)
+    model = hydra.utils.instantiate(config.model, adata=adata)
+    latent = get_latent(model, config.trainer)
+    save_latent(latent, adata.obs_names, "latent.csv")
+    save_history(model)
+
+
+if __name__ == '__main__':
+    main()
