@@ -81,7 +81,7 @@ def save_latent(latent, index, path):
 
 
 def setup_adata(adata, config):
-    if config._target_ == "scvi.model.Cansig":
+    if config._target_ == "scvi.model.CanSig":
         scvi.model.CanSig.setup_anndata(adata, cnv_key="X_cnv", layer="counts")
     elif config._target_ == "scvi.model.SCVI":
         scvi.model.SCVI.setup_anndata(adata, batch_key="sample", layer="counts")
