@@ -46,7 +46,7 @@ class CanSigConfig(ScVIConfig):
     n_cnv_latent: int = 10
     n_cnv_layers: int = 1
     n_cnv_hidden: int = 128
-    n_cnv_dropout_rate: float = 0.1
+    cnv_dropout_rate: float = 0.1
 
 
 @dataclass

@@ -113,7 +113,7 @@ class CanSig(
         prior_kwargs: Optional[dict] = None,
         n_cnv_layers: int = 1,
         n_cnv_hidden: int = 128,
-        n_cnv_dropout_rate: float = 0.1,
+        cnv_dropout_rate: float = 0.1,
         **model_kwargs,
     ):
         super().__init__(adata)
@@ -142,7 +142,7 @@ class CanSig(
             n_cnv_latent=n_cnv_latent,
             n_cnv_layers=n_cnv_layers,
             n_cnv_hidden=n_cnv_hidden,
-            n_cnv_dropoutrate=n_cnv_dropoutrate,
+            cnv_dropout_rate=cnv_dropout_rate,
             n_labels=self.summary_stats.n_labels,
             n_continuous_cov=self.summary_stats.get("n_extra_continuous_covs", 0),
             n_cats_per_cov=n_cats_per_cov,

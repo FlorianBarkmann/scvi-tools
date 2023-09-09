@@ -33,14 +33,14 @@ def kl_normal_normal(p, q):
     return kl(p, nq)
 
 
-def cnv_encoder_factory(n_cnv: int, n_cnv_latent: int, cnv_n_layers: int = 1,
-                        cnv_n_hidden: int = 128,
+def cnv_encoder_factory(n_cnv: int, n_cnv_latent: int, n_cnv_layers: int = 1,
+                        n_cnv_hidden: int = 128,
                         cnv_dropout_rate: float = 0.1):
-    if cnv_n_layers == 0:
+    if n_cnv_layers == 0:
         return nn.Linear(n_cnv, n_cnv_latent)
     return (
         torch.nn.Sequential(
-            *[FCLayers(n_cnv, cnv_n_hidden, n_layers=cnv_n_layers, n_hidden=cnv_n_hidden,
+            *[FCLayers(n_cnv, n_cnv_hidden, n_layers=n_cnv_layers, n_hidden=n_cnv_hidden,
                        inject_covariates=False, dropout_rate=cnv_dropout_rate),
               nn.Linear(128, n_cnv_latent)])
     )
@@ -127,7 +127,7 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
         n_cnv_latent: int,
         n_cnv_layers: int = 1,
         n_cnv_hidden: int = 128,
-        n_cnv_dropout_rate: float = 0.1,
+        cnv_dropout_rate: float = 0.1,
         n_batch: int = 0,
         n_labels: int = 0,
         n_hidden: Tunable[int] = 128,
@@ -145,7 +145,6 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
         prior_distribution: Tunable[Literal[
             "sdnormal", "normal", "mixofgaus", "vamp", "normalflow"]] = "sdnormal",
         prior_kwargs: Optional[dict] = None,
-        cnv_encoder_kwargs: Optional[dict] = None,
         encode_covariates: Tunable[bool] = False,
         deeply_inject_covariates: Tunable[bool] = True,
         use_batch_norm: Tunable[Literal["encoder", "decoder", "none", "both"]] = "both",
@@ -155,8 +154,8 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
         library_log_means: Optional[np.ndarray] = None,
         library_log_vars: Optional[np.ndarray] = None,
         var_activation: Optional[Callable] = None,
-        extra_encoder_kwargs: Optional[dict] = None,
         extra_decoder_kwargs: Optional[dict] = None,
+        extra_encoder_kwargs: Optional[dict] = None
     ):
         super().__init__()
         self.dispersion = dispersion
@@ -211,9 +210,10 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
         cat_list = [n_batch] + list([] if n_cats_per_cov is None else n_cats_per_cov)
         encoder_cat_list = cat_list if encode_covariates else None
 
-        self.cnv_encoder = cnv_encoder_factory(n_cnv, n_cnv_latent, n_cnv_layers,
-                                               n_cnv_hidden,
-                                               n_cnv_dropout_rate)
+        self.cnv_encoder = cnv_encoder_factory(n_cnv, n_cnv_latent, n_cnv_layers=n_cnv_layers,
+                                               n_cnv_hidden=n_cnv_hidden,
+                                               cnv_dropout_rate=cnv_dropout_rate)
+        _extra_encoder_kwargs = extra_encoder_kwargs or {}
 
         self.z_encoder = Encoder(
             n_input_encoder,
