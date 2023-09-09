@@ -54,6 +54,7 @@ class Config:
     data_path: str
     model: ModelConfig
     n_hvg: int = 4000
+    remove_cycling_cells: bool = False
     trainer: TrainingConfig = TrainingConfig()
 
 
@@ -64,8 +65,10 @@ cs.store(group="model", name="cansig", node=CanSigConfig())
 cs.store(group="model", name="scvi", node=ScVIConfig())
 
 
-def read_data(data_path: str, n_hvg: int):
+def read_data(data_path: str, n_hvg: int, remove_cycling_cells: bool):
     adata = sc.read(data_path)
+    if remove_cycling_cells:
+        adata = adata[adata.obs["phase"]=="G1"].copy()
     sc.pp.highly_variable_genes(adata, n_top_genes=n_hvg, subset=True)
     return adata
 
@@ -108,7 +111,7 @@ def dump_config(config: Config):
 @hydra.main(config_name="config", config_path=None, version_base="1.1")
 def main(config: Config):
     dump_config(config)
-    adata = read_data(config.data_path, n_hvg=config.n_hvg)
+    adata = read_data(config.data_path, n_hvg=config.n_hvg, remove_cycling_cells=config.remove_cycling_cells)
     setup_adata(adata, config.model)
     model = hydra.utils.instantiate(config.model, adata=adata)
     latent = get_latent(model, config.trainer)
