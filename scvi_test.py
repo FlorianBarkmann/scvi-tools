@@ -53,6 +53,7 @@ class CanSigConfig(ScVIConfig):
 class Config:
     data_path: str
     model: ModelConfig
+    n_hvg: int = 4000
     trainer: TrainingConfig = TrainingConfig()
 
 
@@ -63,8 +64,10 @@ cs.store(group="model", name="cansig", node=CanSigConfig())
 cs.store(group="model", name="scvi", node=ScVIConfig())
 
 
-def read_data(data_path: str):
-    return sc.read(data_path)
+def read_data(data_path: str, n_hvg: int):
+    adata = sc.read(data_path)
+    sc.pp.highly_variable_genes(adata, n_top_genes=n_hvg, subset=True)
+    return adata
 
 
 def get_latent(model, trainer_config: TrainingConfig):
@@ -105,7 +108,7 @@ def dump_config(config: Config):
 @hydra.main(config_name="config", config_path=None, version_base="1.1")
 def main(config: Config):
     dump_config(config)
-    adata = read_data(config.data_path)
+    adata = read_data(config.data_path, n_hvg=config.n_hvg)
     setup_adata(adata, config.model)
     model = hydra.utils.instantiate(config.model, adata=adata)
     latent = get_latent(model, config.trainer)
