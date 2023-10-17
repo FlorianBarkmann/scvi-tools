@@ -8,7 +8,7 @@ from ._constants import METRIC_KEYS, REGISTRY_KEYS
 from ._settings import settings
 
 # this import needs to come after prior imports to prevent circular import
-from . import autotune, data, model, external, utils, criticism
+from . import autotune, data, model, utils
 
 from importlib.metadata import version
 

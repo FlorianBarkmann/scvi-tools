@@ -13,6 +13,7 @@ class MixOfGausPrior(BasePrior):
         self.w = torch.nn.Parameter(torch.zeros(k,))
         self.mean = torch.nn.Parameter(torch.randn((k,n_latent)))
         self.logvar = torch.nn.Parameter(torch.randn((k,n_latent)))
+
     @property
     def distribution(self):
         comp = Normal(self.mean,torch.exp(0.5 * self.logvar))
@@ -25,6 +26,6 @@ class MixOfGausPrior(BasePrior):
 
     def log_prob(self, z):
         return self.distribution.log_prob(z)
-    
+
     def description(self):
         return "Mixture of Gaussians with w: " +str(self.w)+ "Prior with means: " + str(self.mean) + " and log variance: " + str(self.logvar)

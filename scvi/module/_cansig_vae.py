@@ -655,11 +655,7 @@ class CanSigVAE(BaseMinifiedModeModuleClass):
             reconst_loss = losses.dict_sum(losses.reconstruction_loss)
 
             # Log-probabilities
-            p_z = (
-                Normal(torch.zeros_like(qz.loc), torch.ones_like(qz.scale))
-                .log_prob(z)
-                .sum(dim=-1)
-            )
+            p_z = self.prior.log_prob(z).sum(dim=-1)
             p_x_zl = -reconst_loss
             q_z_x = qz.log_prob(z).sum(dim=-1)
             log_prob_sum = p_z + p_x_zl - q_z_x

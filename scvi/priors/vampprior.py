@@ -16,9 +16,9 @@ class VampPrior(BasePrior):
         self.encoder = encoder
         self.register_buffer("pseudo_inputs", torch.eye(n_components))
         self.pseudo_transfromer = nn.Sequential(*[
-            nn.Linear(n_components, 256),
+            nn.Linear(n_components, n_hidden),
             nn.ReLU(),
-            nn.Linear(256, n_input),
+            nn.Linear(n_hidden, n_input),
             nn.ReLU()
         ])
 
@@ -37,7 +37,7 @@ class VampPrior(BasePrior):
 
     def log_prob(self, z):
         return self.distribution.log_prob(z)
-    
+
     def description(self):
         return "Vamp Prior with pseudo inputs: " + str(self.pseudo_inputs) + " and mixing parameter : " + str(self.w)
 
